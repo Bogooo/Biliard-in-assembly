@@ -45,6 +45,7 @@ culoare_maro equ 663300h
 culoare_maro_contur equ 4d2600h
 culoare_butoane equ 0ff8533h
 culoare_butoane_contur equ 0cc5200h
+culoare_alb equ 0fffffffh
 
 
 arg1 EQU 8
@@ -55,10 +56,15 @@ arg4 EQU 20
 bila_size equ 20
 x_bila dd 70
 y_bila dd 95
+x_bila2 dd 505
+y_bila2 dd 235
 x_directie dd 1
 y_directie dd 0
+x_directie2 dd 0
+y_directie2 dd 0
 x_inm dd 15
 y_inm dd 10
+nr_bila dd 0
 
 
 symbol_width EQU 10
@@ -276,6 +282,7 @@ draw_bila proc
 	mov ebp, esp
 	pusha
 	lea esi,bila
+	add esi,nr_bila
 	mov ecx, bila_size
 bucla_simbol_linii:
 	mov edi, [ebp+arg1] ; pointer la matricea de pixeli
@@ -291,11 +298,13 @@ bucla_simbol_linii:
 	mov ecx, bila_size
 bucla_simbol_coloane:
 	cmp byte ptr [esi], 0
-	je simbol_pixel_fundal
+	je simbol_pixel_next
+	cmp byte ptr [esi], 2
+	je simbol_pixel_culoare_2
 	mov dword ptr [edi], 0
 	jmp simbol_pixel_next
-simbol_pixel_fundal:
-	mov dword ptr [edi], culoare_verde
+simbol_pixel_culoare_2:
+	mov dword ptr [edi],culoare_alb
 simbol_pixel_next:
 	inc esi
 	add edi, 4
@@ -510,6 +519,66 @@ local stanga_end,dreapta_end,sus_end,jos_end
 	jos_end:
 endm
 
+bila_check macro
+local comparare_y,endd,modificari
+	push eax
+	mov eax,x_bila2
+	add eax,20
+	cmp x_bila,eax
+	jg endd
+	sub eax,40
+	cmp x_bila,eax
+	jl endd
+	mov eax,y_bila2
+	add eax,20
+	cmp y_bila,eax
+	jg endd
+	sub eax,40
+	cmp y_bila,eax
+	jl endd
+	mov eax,x_directie
+	mov x_directie2,eax
+	mov eax,y_directie
+	mov y_directie2,eax
+	not x_directie
+	add x_directie,1
+	not y_directie
+	add y_directie,1
+	
+endd:
+pop eax
+endm
+
+wall_check_bila2 macro x,y
+local stanga_end,dreapta_end,sus_end,jos_end
+	cmp x,70
+	jne stanga_end
+	cmp x_directie2,-1
+	jne stanga_end
+	mov x_directie2,1
+	stanga_end:
+	
+	cmp x,565
+	jne dreapta_end
+	cmp x_directie2,1
+	jne dreapta_end
+	mov x_directie2,-1
+	dreapta_end:
+	
+	cmp y,95
+	jne sus_end
+	cmp y_directie2,-1
+	jne sus_end
+	mov y_directie2,1
+	sus_end:
+	
+	cmp y,355
+	jne jos_end
+	cmp y_directie2,1
+	jne jos_end
+	mov y_directie2,-1
+	jos_end:
+endm
 ; functia de desenare - se apeleaza la fiecare click
 ; sau la fiecare interval de 200ms in care nu s-a dat click
 ; arg1 - evt (0 - initializare, 1 - click, 2 - s-a scurs intervalul fara click)
@@ -562,9 +631,9 @@ evt_click:
 	jmp afisare_litere
 	
 evt_timer:
-	
 	delete_bila_macro x_bila,y_bila
 	wall_check x_bila,y_bila
+	bila_check 
 	push eax
 	
 	mov  eax,x_directie
@@ -572,19 +641,38 @@ evt_timer:
 	add eax,x_bila
 	mov  x_bila,eax
 	
-	
 	mov  eax,y_directie
 	mul y_inm
 	add eax,y_bila
 	mov  y_bila,eax
 	pop eax
+	mov nr_bila,0
 	draw_bila_macro area,x_bila,y_bila
+	
+	delete_bila_macro x_bila2,y_bila2
+	wall_check_bila2 x_bila2,y_bila2
+	push eax
+	
+	mov  eax,x_directie2
+	mul x_inm
+	add eax,x_bila2
+	mov  x_bila2,eax
+	
+	mov  eax,y_directie2
+	mul y_inm
+	add eax,y_bila2
+	mov  y_bila2,eax
+	pop eax
+	
+	mov nr_bila,400
+	draw_bila_macro area,x_bila2,y_bila2
 	
 	inc counter
 	cmp counter,5
 	jne afisare_litere
 	inc counters
 	mov counter,0
+	
 	
 afisare_litere:
 	;afisam valoarea counter-ului curent (sute, zeci si unitati)
